@@ -3,7 +3,6 @@
 # Environents
 .env
 
-/database
 /venv
 /__pycache__
 
