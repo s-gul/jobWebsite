@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>My Webpage</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href='https://fonts.googleapis.com/css?family=Inter' rel='stylesheet'>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="{{ url_for('static', filename='scripts/navbar.js') }}"></script>
+    <script>
+        const logged_in = {{ is_logged_in | tojson }};
+    </script>
+</head>
+<body id="home">
+    {% include "components/navbar.html" %}
+
+    <div class="cards-container">
+        {% for job in jobs %}
+            <div class="job-card-container">
+                <div class="job-card">
+                    <div class="job-card-details">
+                        <div class="job-card-left">
+                            <div class="job-card-left-top">
+                                <div class="applied-icon-container">
+                                    <button class="applied-icon-button" data-job-id="{{ job.id }}"  onclick="handleAppliedJob(event)">
+                                        <img src="/static/images/applied_icon.svg" alt="Applied Icon">
+                                    </button>
+                                </div>
+                                <h1 class="job-title">{{job.title}}</h1>
+                            </div>
+                            <p class="job-description" data-description="{{job.description}}"></p>
+                        </div>
+                        <div class="job-card-right">
+                            <div class="job-card-right-top">
+                                <div class="save-job-container">
+                                    <button 
+                                        class="save-job-button" 
+                                        data-job-id="{{ job.id }}" 
+                                        onclick="handleSaveJob(event)"
+                                    >
+                                        Save Job
+                                    </button>
+                                </div>
+                                <div>
+                                    <a href="{{job.url}}" target="_blank">
+                                        <img class="redirect-icon" src="{{ url_for('static', filename='images/redirect_icon.svg') }}" alt="Go to Job">
+                                    </a>
+                                    <div class="company-container">
+                                        <img id="company-icon" src="{{ url_for('static', filename='images/company_icon.svg') }}" alt="Company Icon">
+                                        <h2 class="company-name">{{job.company}}</h2>
+                                    </div>
+                                    {% if job.location != None %}
+                                        <p class="job-location">{{job.location}}</p>
+                                    {% endif %}
+                                </div>
+                                {% if job.remote %}
+                                    <div class="remote"><p class="job-label">remote</p></div>
+                                {% elif job.hybrid %}
+                                    <div class="hybrid"><p class="job-label">hybrid</p></div>
+                                {% endif %}
+                                <!-- <div class="job-type-ft"><p class="job-label">full-time</p></div>
+                                <div class="job-type-pt"><p class="job-label">part-time</p></div> -->
+                            </div>
+                            <p class="date-posted-p-tag">Posted: {{job.date_posted}}</p>
+                        </div>
+                    </div>
+                </div>
+                <img class="toggle-icon" src="/static/images/open_icon.svg" alt="Toggle Description">
+            </div>
+        {% endfor %}
+    </div>
+
+    <div id="login-popup" class="popup">
+        <div class="popup-content">
+            <div class="close-button">
+                <img class="close-button" onclick="closeLoginPopup()" src="{{ url_for('static', filename='images/cross_off_icon.svg') }}" alt="Close">
+            </div>
+            <h2>Sign In</h2>
+            <p id="popup-description">Enter your email to receive a login code.</p>
+            <form id="login-form">
+                <div id="email-section">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" name="email" placeholder="Enter your email" required>
+                    <button type="submit" class="submit-button">Send Code</button>
+                </div>
+                <div id="code-section" style="display: none;">
+                    <label for="code">Enter Code:</label>
+                    <div class="code-input-container">
+                        <input type="text" maxlength="1" class="code-input" name="code1" >
+                        <input type="text" maxlength="1" class="code-input" name="code2" >
+                        <input type="text" maxlength="1" class="code-input" name="code3" >
+                        <input type="text" maxlength="1" class="code-input" name="code4" >
+                    </div>
+                    <button type="button" id="verify-code-button" class="submit-button">Verify Code</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Load More Button -->
+    <div class="load-more-container">
+        <button id="load-more-button" class="load-more-button">Load More</button>
+    </div>
+
+    <script>
+        let offset = 2; // Default offset starts at 2 to avoid duplicate jobs
+        const limit = 2; // Number of jobs to load per request
+        let loading = false; // Prevent multiple simultaneous requests
+
+        // Function to load jobs
+        function loadMoreJobs() {
+            if (loading) return; // Prevent multiple requests
+            loading = true;
+
+            // Get current query, filters, and date posted values
+            const searchQuery = document.querySelector(".searchbar").value;
+            const datePosted = document.getElementById("date-posted").value;
+            const filtersForm = document.querySelector(".filters-form");
+            const formData = new FormData(filtersForm);
+            const filters = new URLSearchParams(formData).toString();
+
+            // Build the query string for the AJAX request
+            const queryString = `/load_jobs?offset=${offset}&limit=${limit}&query=${encodeURIComponent(searchQuery)}&date_posted=${datePosted}&${filters}`;
+
+            fetch(queryString)
+                .then(response => response.json())
+                .then(jobs => {
+                    const cardsContainer = document.querySelector(".cards-container");
+
+                    // Append new jobs to the cards container
+                    jobs.forEach(job => {
+                        const jobCardContainer = document.createElement("div");
+                        jobCardContainer.className = "job-card-container";
+                        jobCardContainer.innerHTML = `
+                            <div class="job-card">
+                                <div class="job-card-details">
+                                    <div class="job-card-left">
+                                        <div class="job-card-left-top">
+                                            <div class="applied-icon-container">
+                                                <button class="applied-icon-button" data-job-id="${job.id}"  onclick="handleAppliedJob(event)">
+                                                    <img src="/static/images/applied_icon.svg" alt="Applied Icon">
+                                                </button>
+                                            </div>
+                                            <h1 class="job-title">${job.title}</h1>
+                                        </div>
+                                        <p class="job-description" data-description="${job.description}"></p>
+                                    </div>
+                                    <div class="job-card-right">
+                                        <div class="job-card-right-top">
+                                            <div class="save-job-container">
+                                                <button 
+                                                    class="save-job-button" 
+                                                    data-job-id="${job.id}" 
+                                                    onclick="handleSaveJob(event)"
+                                                >
+                                                    Save Job
+                                                </button>
+                                            </div>
+                                            <div>
+                                                <a href="${job.url}" target="_blank">
+                                                    <img class="redirect-icon" src="{{ url_for('static', filename='images/redirect_icon.svg') }}" alt="Go to Job">
+                                                </a>
+                                                <div class="company-container">
+                                                    <img id="company-icon" src="/static/images/company_icon.svg" alt="Company Icon">
+                                                    <h2 class="company-name">${job.company}</h2>
+                                                </div>
+                                                ${job.location ? `<p class="job-location">${job.location}</p>` : ""}
+                                            </div>
+                                            ${job.remote ? `<div class="remote"><p class="job-label">remote</p></div>` : ""}
+                                            ${job.hybrid ? `<div class="hybrid"><p class="job-label">hybrid</p></div>` : ""}
+                                        </div>
+                                        <p class="date-posted-p-tag">Posted: ${job.date_posted}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <img class="toggle-icon" src="/static/images/open_icon.svg" alt="Toggle Description">
+                        `;
+                        cardsContainer.appendChild(jobCardContainer);
+
+                        // Parse the job description for the newly added card
+                        const descriptionElement = jobCardContainer.querySelector(".job-description");
+                        const rawDescription = descriptionElement.getAttribute("data-description");
+                        descriptionElement.innerHTML = marked.parse(rawDescription);
+
+                        // Add toggle functionality for the newly added card
+                        const toggleIcon = jobCardContainer.querySelector(".toggle-icon");
+                        const jobCard = jobCardContainer.querySelector(".job-card");
+
+                        toggleIcon.addEventListener("click", () => {
+                            const isExpanded = jobCard.classList.contains("expanded");
+
+                            if (isExpanded) {
+                                // Collapse the job card
+                                jobCard.classList.remove("expanded");
+                                toggleIcon.classList.remove("open"); // Remove rotation
+                            } else {
+                                // Expand the job card
+                                jobCard.classList.add("expanded");
+                                toggleIcon.classList.add("open"); // Add rotation
+                            }
+                        });
+                    });
+
+                    // Update offset for the next request
+                    offset += limit;
+
+                    // If no jobs are returned, hide the button and show a message
+                    if (jobs.length === 0) {
+                        const loadMoreButton = document.getElementById("load-more-button");
+                        loadMoreButton.style.display = "none";
+
+                        const noJobsMessage = document.createElement("p");
+                        noJobsMessage.className = "no-jobs-message";
+                        noJobsMessage.textContent = "No more jobs to display.";
+                        document.querySelector(".load-more-container").appendChild(noJobsMessage);
+                    }
+
+                    loading = false;
+                })
+                .catch(error => {
+                    console.error("Error loading jobs:", error);
+                    loading = false;
+                });
+        }
+
+        function showLoginPopup() {
+            if (logged_in) {
+                window.location.href = "/dashboard";
+            } else {
+                const popup = document.getElementById("login-popup");
+                popup.style.display = "block";
+            }
+        }
+
+        function closeLoginPopup() {
+            const popup = document.getElementById("login-popup");
+            popup.style.display = "none";
+        }
+        
+        function handleSaveJob(event) {
+            const saveButton = event.target;
+            const jobId = saveButton.getAttribute("data-job-id");
+
+            // Send a request to save the job
+            fetch("/save_job", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ job_id: jobId }),
+            })
+                .then(response => {
+                    if (response.status === 401) {
+                        // If the user is not logged in, show the login popup
+                        showLoginPopup();
+                    } else if (response.status === 200) {
+                        // If the job is already saved or successfully saved
+                        return response.json().then(data => {
+                            if (data.message === "Job already saved") {
+                                saveButton.textContent = "Saved";
+                                saveButton.disabled = true;
+                                alert("Job already saved.");
+                            } else {
+                                saveButton.textContent = "Saved";
+                                saveButton.disabled = true; // Disable the button to prevent duplicate saves
+                            }
+                        });
+                    } else {
+                        throw new Error("Failed to save job");
+                    }
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    alert("An error occurred while saving the job. Please try again.");
+                });
+        }
+        
+        function handleAppliedJob(event) {
+            const appliedButton = event.target.closest(".applied-icon-button");
+            const jobId = appliedButton.getAttribute("data-job-id");
+
+            // Send a request to save the applied job
+            fetch("/apply_job", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ job_id: jobId }),
+            })
+                .then(response => {
+                    if (response.status === 401) {
+                        // If the user is not logged in, show the login popup
+                        showLoginPopup();
+                    } else if (response.status === 200) {
+                        appliedButton.disabled = true; // Disable the button after applying
+                    } else {
+                        throw new Error("Failed to mark job as applied.");
+                    }
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    alert("An error occurred while marking the job as applied. Please try again.");
+                });
+        }
+
+        // Bind the "Load More" button to the loadMoreJobs function
+        document.getElementById("load-more-button").addEventListener("click", loadMoreJobs);
+
+        // Parse job descriptions using Marked.js
+        document.querySelectorAll(".job-description").forEach(descriptionElement => {
+            const rawDescription = descriptionElement.getAttribute("data-description");
+            descriptionElement.innerHTML = marked.parse(rawDescription);
+        });
+
+        document.querySelectorAll(".job-card-container").forEach(container => {
+            const toggleIcon = container.querySelector(".toggle-icon");
+            const jobCard = container.querySelector(".job-card"); // Target the job-card inside the container
+
+            toggleIcon.addEventListener("click", () => {
+                const isExpanded = jobCard.classList.contains("expanded");
+
+                if (isExpanded) {
+                    // Collapse the job card
+                    jobCard.classList.remove("expanded");
+                    toggleIcon.classList.remove("open"); // Remove rotation
+                } else {
+                    // Expand the job card
+                    jobCard.classList.add("expanded");
+                    toggleIcon.classList.add("open"); // Add rotation
+                }
+            });
+        });
+
+        document.getElementById("login-form").addEventListener("submit", function (event) {
+            event.preventDefault(); // Prevent form submission
+
+            const emailSection = document.getElementById("email-section");
+            const codeSection = document.getElementById("code-section");
+            const popupDescription = document.getElementById("popup-description");
+            const sendCodeButton = document.querySelector("#email-section .submit-button");
+
+            const emailInput = document.getElementById("email").value;
+
+            if (emailInput) {
+                // Show loading state
+                sendCodeButton.textContent = "Sending...";
+                sendCodeButton.disabled = true;
+
+                // Send the email to the server
+                fetch("/login", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                    body: new URLSearchParams({ email: emailInput })
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error("Failed to send login code");
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            // Hide email section and show code section
+                            emailSection.style.display = "none";
+                            codeSection.style.display = "block";
+
+                            // Add required attribute to code inputs
+                            document.querySelectorAll(".code-input").forEach(input => {
+                                input.setAttribute("required", "true");
+                            });
+
+                            // Update popup description
+                            popupDescription.textContent = "Enter the code sent to your email.";
+                        } else {
+                            alert("Error: " + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error:", error);
+                        alert("Failed to send login code. Please try again.");
+                    })
+                    .finally(() => {
+                        // Reset button state
+                        sendCodeButton.textContent = "Send Code";
+                        sendCodeButton.disabled = false;
+                    });
+            } else {
+                alert("Please enter a valid email address.");
+            }
+        });
+
+        document.querySelectorAll(".code-input").forEach((input, index, inputs) => {
+            // Handle typing into the input
+            input.addEventListener("input", (event) => {
+                const value = event.target.value;
+
+                // Move to the next input if a value is entered
+                if (value.length === 1 && index < inputs.length - 1) {
+                    inputs[index + 1].focus();
+                }
+
+                // Prevent entering more than one character
+                if (value.length > 1) {
+                    event.target.value = value.charAt(0);
+                }
+            });
+
+            // Handle backspace to move to the previous input
+            input.addEventListener("keydown", (event) => {
+                if (event.key === "Backspace" && !input.value && index > 0) {
+                    inputs[index - 1].focus();
+                }
+            });
+
+            // Handle pasting into the input
+            input.addEventListener("paste", (event) => {
+                event.preventDefault();
+                const pasteData = event.clipboardData.getData("text").slice(0, inputs.length);
+
+                // Fill inputs with pasted data
+                pasteData.split("").forEach((char, i) => {
+                    if (inputs[i]) {
+                        inputs[i].value = char;
+                    }
+                });
+
+                // Focus the last filled input
+                const lastFilledIndex = Math.min(pasteData.length - 1, inputs.length - 1);
+                inputs[lastFilledIndex].focus();
+            });
+        });
+
+        document.getElementById("verify-code-button").addEventListener("click", function () {
+            const codeInputs = document.querySelectorAll(".code-input");
+            const emailInput = document.getElementById("email").value;
+            const code = Array.from(codeInputs).map(input => input.value).join("");
+
+            if (code.length === 4) {
+                // Send the code to the server for verification
+                fetch("/verify", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                    body: new URLSearchParams({ email: emailInput, code: code }),
+                })
+                    .then(response => {
+                        if (response.ok) {
+                            // If the server redirects, the browser will handle it automatically
+                            window.location.href = response.url;
+                        } else {
+                            return response.json().then(data => {
+                                throw new Error(data.message || "Failed to verify login code");
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error:", error);
+                        alert(error.message || "Failed to verify login code. Please try again.");
+
+                        // Clear the code inputs and remove the required attribute
+                        codeInputs.forEach(input => {
+                            input.value = "";
+                            input.removeAttribute("required"); // Ensure the required attribute is completely removed
+                        });
+
+                        // Reset the login popup to the "Enter Email" section
+                        const emailSection = document.getElementById("email-section");
+                        const codeSection = document.getElementById("code-section");
+                        const popupDescription = document.getElementById("popup-description");
+
+                        emailSection.style.display = "block";
+                        codeSection.style.display = "none";
+                        popupDescription.textContent = "Enter your email to receive a login code.";
+                    });
+            } else {
+                alert("Please enter a valid 4-digit code.");
+            }
+        });
+    </script>
+</body>
+</html>

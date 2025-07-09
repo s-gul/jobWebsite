@@ -1,0 +1,14 @@
+#.gitignore
+
+# Environents
+.env
+
+/database
+/venv
+/__pycache__
+
+get_jobs_Apify.py
+get_jobs_TheirStack.py
+mock_data_TheirStack.json
+scrape_jobs_copy.py
+setup_database.py

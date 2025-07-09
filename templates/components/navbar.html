@@ -1,0 +1,46 @@
+<div class="top-bar">
+    <div class="top-bar-left">
+        <form method="GET" onsubmit=fetchJobs(event) class="search-form">
+            <div class="search">
+                <input class="searchbar" name="query" value="{{ query }}" placeholder="search for jobs" />
+                <button type="submit" class="search-button">
+                    <img class="search-icon" src="{{ url_for('static', filename='images/search_icon.svg') }}" alt="Search Icon">
+                </button>
+            </div>
+        </form>
+
+        <!-- Filters dropdown -->
+        <div class="filters-container">
+            <img class="filter-icon" src="{{ url_for('static', filename='images/filters_icon.svg') }}" alt="Filters" onclick="toggleFiltersDropdown()">
+            <form method="GET" onsubmit=fetchJobs(event) class="filters-form">
+                <div class="filters-dropdown" id="filters-dropdown">
+                    <div class="center-filters">
+                        <label>
+                            <input type="checkbox" name="remote" value="1" {% if filters.get('remote') %}checked{% endif %}> Remote
+                        </label>
+                        <label>
+                            <input type="checkbox" name="hybrid" value="1" {% if filters.get('hybrid') %}checked{% endif %}> Hybrid
+                        </label>
+                        <button type="submit" class="filters-done-button">Done</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <form class="date-posted" method="GET">
+            <label for="date-posted">Date Posted:</label>
+            <select name="date_posted" id="date-posted" onchange="handleDatePostedChange(this.form);">
+                <option value="" {% if date_posted == '' %}selected{% endif %}>Any Time</option>
+                <option value="24_hours" {% if date_posted == '24_hours' %}selected{% endif %}>Past 24 Hours</option>
+                <option value="few_days" {% if date_posted == 'few_days' %}selected{% endif %}>Past Few Days</option>
+                <option value="last_week" {% if date_posted == 'last_week' %}selected{% endif %}>Last Week</option>
+                <option value="last_two_weeks" {% if date_posted == 'last_two_weeks' %}selected{% endif %}>Last Two Weeks</option>
+            </select>
+        </form>
+    </div>
+
+    <div class="my-jobs-button" onclick="showLoginPopup()">
+        <img class="person-icon" src="{{ url_for('static', filename='images/person_icon.svg') }}" alt="Person">
+        <p>My Jobs</p>
+    </div>
+</div>

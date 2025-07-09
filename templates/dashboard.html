@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>User Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href='https://fonts.googleapis.com/css?family=Inter' rel='stylesheet'>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="{{ url_for('static', filename='scripts/navbar.js') }}"></script>
+</head>
+<body id="dashboard">
+    {% include "components/navbar.html" %}
+
+    <div class="tabs-container">
+        <div class="tabs-buttons">
+            <button class="tab-button active" data-tab="saved-jobs-tab" onclick="switchTab('saved-jobs-tab')">Saved Jobs</button>
+            <button class="tab-button" data-tab="applied-jobs-tab" onclick="switchTab('applied-jobs-tab')">Applied Jobs</button>
+        </div>
+        <div class="tabs-content">
+            <!-- Saved Jobs Tab -->
+            <div id="saved-jobs-tab" class="tab-content">
+                <div class="cards-container">
+                    {% for job in saved_jobs %}
+                        <div class="job-card-container">
+                            <div class="job-card">
+                                <div class="job-card-details">
+                                    <div class="job-card-left">
+                                        <h1 class="job-title">{{job.title}}</h1>
+                                        <p class="job-description" data-description="{{job.description}}"></p>
+                                    </div>
+                                    <div class="job-card-right">
+                                        <div class="job-card-right-top">
+                                            <div class="save-job-container">
+                                                <button 
+                                                    class="save-job-button" 
+                                                    data-job-id="{{ job.id }}" 
+                                                    onclick="handleDeleteSavedJob(event)"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                            <div>
+                                                <a href="{{job.url}}" target="_blank">
+                                                    <img class="redirect-icon" src="{{ url_for('static', filename='images/redirect_icon.svg') }}" alt="Go to Job">
+                                                </a>
+                                                <div class="company-container">
+                                                    <img id="company-icon" src="{{ url_for('static', filename='images/company_icon.svg') }}" alt="Company Icon">
+                                                    <h2 class="company-name">{{job.company}}</h2>
+                                                </div>
+                                                {% if job.location != None %}
+                                                    <p class="job-location">{{job.location}}</p>
+                                                {% endif %}
+                                            </div>
+                                            {% if job.remote %}
+                                                <div class="remote"><p class="job-label">remote</p></div>
+                                            {% elif job.hybrid %}
+                                                <div class="hybrid"><p class="job-label">hybrid</p></div>
+                                            {% endif %}
+                                        </div>
+                                        <p class="date-posted-p-tag">Posted: {{job.date_posted}}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <img class="toggle-icon" src="/static/images/open_icon.svg" alt="Toggle Description">
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Applied Jobs Tab -->
+            <div id="applied-jobs-tab" class="tab-content" style="display: none;">
+                <!-- <div class="data-grid-header">
+                    <img width="50" src="{{ url_for('static', filename='images/export.svg') }}">
+                </div> -->
+                <table class="data-grid">
+                    <thead>
+                        <tr>
+                            <th>Date Applied</th>
+                            <th>Title</th>
+                            <th>Company</th>
+                            <th>Location</th>
+                            <th>Remote</th>
+                            <th>Hybrid</th>
+                            <th>Apply Link</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for job in applied_jobs %}
+                            <tr>
+                                <td>{{job.date_applied}}</td>
+                                <td>{{job.job_title}}</td>
+                                <td>{{job.company}}</td>
+                                <td>{{job.location}}</td>
+                                <td><input type="checkbox" {% if job.remote %}checked{% endif %} disabled/></td>
+                                <td><input type="checkbox" {% if job.hybrid %}checked{% endif %} disabled/></td>
+                                <td><a href="{{job.apply_link}}" target="_blank">Apply</a></td>
+                                <td>
+                                    <button class="del-apply-job-btn" data-job-id="{{ job.job_id }}" onclick="handleDeleteAppliedJob(event)" >Delete</button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // JavaScript to handle tab switching
+        function switchTab(tabId) {
+            const tabs = document.querySelectorAll(".tab-content");
+            const tabButtons = document.querySelectorAll(".tab-button");
+
+            // Hide all tab contents
+            tabs.forEach(tab => tab.style.display = "none");
+
+            // Remove active class from all tab buttons
+            tabButtons.forEach(button => button.classList.remove("active"));
+
+            // Show the selected tab and mark the button as active
+            document.getElementById(tabId).style.display = "block";
+            document.querySelector(`[data-tab="${tabId}"]`).classList.add("active");
+        }
+
+        function handleDeleteSavedJob(event) {
+            const btn = event.target.closest(".save-job-button");
+            const jobId = btn.getAttribute("data-job-id");
+
+            // Send a request to delete the saved job
+            fetch("/delete_saved_job", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ job_id: jobId })
+            })
+            .then(response => {
+                if (response.status === 401) {
+                    alert("You must be logged in to delete a job.");
+                    return;
+                } else if (response.status === 200) {
+                    // Remove the job card from the DOM
+                    btn.closest(".job-card-container").remove();
+                } else {
+                    throw new Error("Failed to delete job");
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("An error occurred while deleting the job.");
+            });
+        }
+
+        function handleDeleteAppliedJob(event) {
+            const btn = event.target.closest(".del-apply-job-btn");
+            const jobId = btn.getAttribute("data-job-id");
+
+            // Send a request to delete the applied job
+            fetch("/delete_applied_job", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ job_id: jobId })
+            })
+            .then(response => {
+                if (response.status === 401) {
+                    alert("You must be logged in to delete a job.");
+                    return;
+                } else if (response.status === 200) {
+                    // Remove the job row from the table
+                    btn.closest("tr").remove();
+                } else {
+                    throw new Error("Failed to delete job");
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("An error occurred while deleting the job.");
+            });
+        }
+
+        // Initialize the first tab as active
+        document.addEventListener("DOMContentLoaded", () => {
+            switchTab("saved-jobs-tab");
+        });
+
+        // Parse job descriptions using Marked.js
+        document.querySelectorAll(".job-description").forEach(descriptionElement => {
+            const rawDescription = descriptionElement.getAttribute("data-description");
+            descriptionElement.innerHTML = marked.parse(rawDescription);
+        });
+
+        document.querySelectorAll(".job-card-container").forEach(container => {
+            const toggleIcon = container.querySelector(".toggle-icon");
+            const jobCard = container.querySelector(".job-card"); // Target the job-card inside the container
+
+            toggleIcon.addEventListener("click", () => {
+                const isExpanded = jobCard.classList.contains("expanded");
+
+                if (isExpanded) {
+                    // Collapse the job card
+                    jobCard.classList.remove("expanded");
+                    toggleIcon.classList.remove("open"); // Remove rotation
+                } else {
+                    // Expand the job card
+                    jobCard.classList.add("expanded");
+                    toggleIcon.classList.add("open"); // Add rotation
+                }
+            });
+        });
+    </script>
+</body>
+</html>
